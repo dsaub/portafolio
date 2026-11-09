@@ -25,7 +25,7 @@ function cubeTexture({ name, bg, fg }) {
 
 const snap = (v) => Math.round(v / QUARTER) * QUARTER;
 
-export function buildSkills(scene, skills, spawnArea) {
+export function buildSkills(scene, skills, spawnArea, { onSplash = () => {} } = {}) {
   const geo = new THREE.BoxGeometry(SIZE, SIZE, SIZE);
   const cubes = skills.map((skill, i) => {
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: cubeTexture(skill), roughness: 0.7 }));
@@ -34,6 +34,7 @@ export function buildSkills(scene, skills, spawnArea) {
     const a = (i / skills.length) * Math.PI * 2 + 0.3;
     const r = 4.6 + (i % 2) * 1.4;
     const cube = {
+      name: skill.name,
       mesh,
       pos: new THREE.Vector3(Math.sin(a) * r, HALF, Math.cos(a) * r * 0.85 + 0.5),
       vel: new THREE.Vector3(),
@@ -52,10 +53,12 @@ export function buildSkills(scene, skills, spawnArea) {
     c.vel.set(0, 0, 0);
     c.spin.set(Math.random() * 4, 0, Math.random() * 4);
     c.sinking = 0;
+    c.scored = 0;
   }
 
   return {
     cubes,
+    respawn,
     update(dt, player, colliders, groundAt, edgeAt, sfx) {
       kickCooldown -= dt;
       for (const c of cubes) {
@@ -141,6 +144,7 @@ export function buildSkills(scene, skills, spawnArea) {
         if (dc > edgeAt(c.pos.x, c.pos.z) + 0.6) {
           c.sinking = 0.001;
           sfx.splash();
+          onSplash(c);
         }
       }
 

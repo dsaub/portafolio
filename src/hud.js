@@ -5,14 +5,15 @@ const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 
-export function createHud(projects, profile) {
+export function createHud(projects, profile, secrets) {
   const panel = $('#panel');
   const counter = $('#counter-value');
   const counterBar = $('#counter-bar');
   const toastEl = $('#toast');
   const mini = $('#minimap');
   const mctx = mini.getContext('2d');
-  let toastTimer = null;
+  const toastQueue = [];
+  let toastBusy = false;
   let currentId = null;
 
   function projectHtml(p) {
@@ -45,7 +46,10 @@ export function createHud(projects, profile) {
       <div class="actions">
         <a class="btn" href="${profile.github}" target="_blank" rel="noopener">GitHub @dsaub</a>
       </div>
-      <p class="panel-hint"><kbd>E</kbd> abre mi GitHub</p>`;
+      <p class="panel-hint"><kbd>E</kbd> abre mi GitHub</p>
+      <p class="panel-secret">Psst… esta isla esconde ${secrets.total} secretos (llevas ${secrets.count}).
+        <span class="keys-desktop">Pista: todo ordenador tiene terminal, prueba la tecla <kbd>º</kbd>.</span>
+        <span class="keys-touch">Pista: toca 5 veces mi nombre.</span></p>`;
   }
 
   function buildTextMode() {
@@ -85,11 +89,23 @@ export function createHud(projects, profile) {
       counter.textContent = `${n}/${projects.length}`;
       counterBar.style.width = `${(n / projects.length) * 100}%`;
     },
+    // Los avisos se encolan para que un secreto no tape a otro
     toast(html, ms = 2600) {
-      toastEl.innerHTML = html;
-      toastEl.classList.add('show');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
+      if (toastQueue.length > 3) toastQueue.shift();
+      toastQueue.push({ html, ms });
+      if (toastBusy) return;
+      const next = () => {
+        const item = toastQueue.shift();
+        toastBusy = !!item;
+        if (!item) return;
+        toastEl.innerHTML = item.html;
+        toastEl.classList.add('show');
+        setTimeout(() => {
+          toastEl.classList.remove('show');
+          setTimeout(next, 280);
+        }, item.ms);
+      };
+      next();
     },
     drawMinimap(player, stations, discovered, aboutPos, t) {
       const W = mini.width, H = mini.height;

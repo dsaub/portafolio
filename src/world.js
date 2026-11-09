@@ -6,6 +6,9 @@ export const ISLAND_R = 44;
 export const PLAZA_R = 8.5;
 export const STATION_R = 24;
 export const SIGN_POS = [0, -11.5];
+// Portería escondida entre los dos primeros caminos (noreste)
+export const GOAL_ANGLE = Math.PI / 3;
+export const GOAL_R = 15;
 
 // Ángulo de cada estación alrededor de la plaza (0 = norte queda libre para el cartel)
 export const stationAngle = (i, n) => (i + 0.5) * ((Math.PI * 2) / n);
@@ -118,6 +121,8 @@ export function buildWorld(scene, stationAngles) {
     if (d < PLAZA_R + 2.5 + margin) return true;
     if (d > islandEdge(angleOf(x, z)) - 5) return true;
     if (Math.hypot(x - SIGN_POS[0], z - SIGN_POS[1]) < 6.5) return true;
+    const [gx, gz] = polar(GOAL_ANGLE, GOAL_R + 0.8);
+    if (Math.hypot(x - gx, z - gz) < 6 + margin) return true;
     for (const a of stationAngles) {
       const [sx, sz] = polar(a, STATION_R);
       if (Math.hypot(x - sx, z - sz) < 7 + margin) return true;

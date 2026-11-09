@@ -26,7 +26,13 @@ const FACES = {
     [18, 14, 6, 10], [40, 14, 6, 10],
     [28, 30, 8, 2], [28, 36, 8, 2], [26, 32, 2, 4], [36, 32, 2, 4],
   ],
+  sleep: [
+    [16, 24, 10, 3], [38, 24, 10, 3],
+    [28, 35, 8, 3],
+    [50, 4, 8, 2], [56, 6, 2, 2], [54, 8, 2, 2], [52, 10, 2, 2], [50, 12, 8, 2],
+  ],
 };
+const SLEEP_AFTER = 20;
 
 function drawFace(ctx, face) {
   ctx.fillStyle = '#0d2b1c';
@@ -54,11 +60,14 @@ export class Player {
     this.faceTimer = 0;
     this.blinkTimer = 2;
     this.squash = 1;
+    this.idle = 0;
 
     const shirt = mat(0xff7a3d);
+    this.shirt = shirt;
     const pants = mat(0x2d3a5c);
     const skin = mat(0xf2c9a0);
     const beige = mat(0xe8dcc0);
+    this.casing = beige;
     const dark = mat(0x3b3646);
 
     const box = (w, h, d, m) => {
@@ -137,6 +146,13 @@ export class Player {
       this.faceTex.needsUpdate = true;
     }
     this.faceTimer = duration;
+  }
+
+  // Carcasa dorada: premio por encontrar todos los disquetes
+  setGold(on) {
+    this.casing.color.setHex(on ? 0xffc93c : 0xe8dcc0);
+    this.casing.metalness = on ? 0.55 : 0;
+    this.casing.roughness = on ? 0.35 : 0.85;
   }
 
   get speed() {
@@ -223,6 +239,14 @@ export class Player {
     const h = Math.max(0, this.pos.y - ground);
     this.blob.scale.setScalar(Math.max(0.4, 1 - h * 0.12));
     this.blob.material.opacity = Math.max(0.08, 0.25 - h * 0.03);
+
+    // Si nadie lo mueve en un rato, se echa una siesta
+    if (len > 0.05 || !this.onGround) {
+      this.idle = 0;
+      if (this.face === 'sleep') this.setFace('idle');
+    } else if ((this.idle += dt) > SLEEP_AFTER && this.face !== 'sleep') {
+      this.setFace('sleep', Infinity);
+    }
 
     // Cara: parpadeos y expresiones temporales
     if (this.faceTimer > 0) {

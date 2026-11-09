@@ -65,6 +65,18 @@ export const sfx = {
   splash: () => noise(0.45, 0.12, 1800),
   enter: () => tone(660, 0.07, { type: 'triangle', vol: 0.05 }),
   discover: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, { type: 'triangle', vol: 0.08, delay: i * 0.08 })),
+  secret: () =>
+    [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.18, { type: 'triangle', vol: 0.07, delay: i * 0.06 })),
+  pickup: () => {
+    tone(880, 0.08, { type: 'square', vol: 0.05 });
+    tone(1320, 0.12, { type: 'square', vol: 0.05, delay: 0.07 });
+  },
+  goal: () => {
+    noise(0.9, 0.08, 2400);
+    [392, 523, 659, 784].forEach((f, i) => tone(f, 0.22, { type: 'square', vol: 0.05, delay: 0.05 + i * 0.09 }));
+  },
+  eat: () => tone(660, 0.06, { type: 'square', vol: 0.04, to: 990 }),
+  over: () => tone(330, 0.5, { type: 'sawtooth', vol: 0.05, to: 80 }),
   win: () =>
     [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) =>
       tone(f, 0.25, { type: 'square', vol: 0.045, delay: i * 0.11 })

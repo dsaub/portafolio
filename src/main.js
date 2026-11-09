@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { profile, projects, skills } from './data.js';
-import { buildWorld, terrainHeight, walkLimit, islandEdge, stationAngle, PLAZA_R } from './world.js';
+import { buildWorld, terrainHeight, walkLimit, islandEdge, stationAngle, PLAZA_R, GOAL_ANGLE, GOAL_R } from './world.js';
 import { buildStations, PAD_R } from './stations.js';
 import { Player } from './player.js';
 import { buildSkills } from './skills.js';
@@ -10,6 +10,10 @@ import { createInput } from './input.js';
 import { createHud } from './hud.js';
 import { sfx, initAudio, toggleMute, isMuted } from './audio.js';
 import { damp, polar } from './util.js';
+import { createSecrets, konamiDetector } from './secrets.js';
+import { createTerminal } from './terminal.js';
+import { buildGoal } from './goal.js';
+import { buildFloppies } from './floppies.js';
 
 const STORAGE_KEY = 'elordenador-discovered';
 const ABOUT_POS = [0, -6.3];
@@ -88,20 +92,85 @@ async function main() {
   const edgeAt = (x, z) => islandEdge(Math.atan2(x, -z));
 
   const player = new Player(scene);
-  const skillCubes = buildSkills(scene, skills, () => {
-    const [x, z] = polar(Math.random() * Math.PI * 2, 3 + Math.random() * (PLAZA_R - 4));
-    return [x, z + 1];
-  });
+  let splashes = 0;
+  const skillCubes = buildSkills(
+    scene,
+    skills,
+    () => {
+      const [x, z] = polar(Math.random() * Math.PI * 2, 3 + Math.random() * (PLAZA_R - 4));
+      return [x, z + 1];
+    },
+    { onSplash: () => ++splashes >= 5 && secrets.unlock('chapuzon') }
+  );
   const bursts = createBursts(scene);
+  const goal = buildGoal(scene, colliders, GOAL_ANGLE, GOAL_R);
+  const floppies = buildFloppies(scene, stations, colliders);
+  if (floppies.count === floppies.total) player.setGold(true);
 
   // ---------- Estado ----------
-  const hud = createHud(projects, profile);
-  const discovered = loadDiscovered();
-  hud.setCount(discovered.size);
   let activeId = null;
   let started = false;
-  let won = discovered.size === projects.length;
   let fireworks = 0;
+  let goals = 0;
+  let party = false;
+  let partyTimer = 0;
+
+  const secrets = createSecrets({
+    onUnlock(secret, n, total) {
+      sfx.secret();
+      hud.toast(`<strong>✦ Secreto desbloqueado:</strong> ${secret.name} (${n}/${total})`, 3200);
+    },
+    onAll() {
+      fireworks = 4;
+      setTimeout(() => sfx.win(), 600);
+      hud.toast('<strong>¡Todos los secretos!</strong> Conoces esta isla mejor que yo ✦', 5000);
+    },
+  });
+
+  const hud = createHud(projects, profile, secrets);
+  const discovered = loadDiscovered();
+  hud.setCount(discovered.size);
+  let won = discovered.size === projects.length;
+
+  function toggleParty() {
+    party = !party;
+    if (party) {
+      sfx.win();
+      player.setFace('happy', 3);
+      for (const c of skillCubes.cubes) {
+        if (c.sinking) continue;
+        c.vel.y = 7 + Math.random() * 4;
+        c.spin.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 12);
+      }
+      hud.toast('<strong>¡Modo fiesta!</strong> Repite el código para volver a la normalidad');
+    } else {
+      player.shirt.color.setHex(0xff7a3d);
+    }
+    return party;
+  }
+
+  function scoreGoal(cube) {
+    goals++;
+    goal.setScore(goals);
+    sfx.goal();
+    player.setFace('happy', 2);
+    bursts.spawn(goal.center, [0xffffff, 0x5dff8a, 0xff7a3d, 0xffd23f], 70, { speed: 9, up: 6 });
+    hud.toast(`<strong>¡GOOOL!</strong> Golazo de ${cube.name}`);
+    secrets.unlock('gol');
+    if (goals >= 3) secrets.unlock('hattrick');
+  }
+
+  function pickFloppy(item, n, total) {
+    sfx.pickup();
+    player.setFace('wow', 1);
+    bursts.spawn(new THREE.Vector3(item.x, item.y, item.z), [0x5dff8a, 0xffffff, 0x3a6ea5], 35, { speed: 4, up: 4 });
+    hud.toast(`<strong>¡Disquete encontrado!</strong> ${n}/${total}`);
+    if (n === total) {
+      player.setGold(true);
+      hud.toast('<strong>Carcasa dorada desbloqueada</strong> por recuperar todos los disquetes', 3500);
+      secrets.unlock('disquetes');
+    }
+  }
 
   const interact = () => {
     if (!activeId) return;
@@ -115,6 +184,22 @@ async function main() {
     jumpBtn: $('#jump-btn'),
     onInteract: interact,
     onAnyInput: () => document.body.classList.add('moved'),
+  });
+
+  const terminal = createTerminal({
+    profile,
+    projects,
+    secrets,
+    onOpen: () => input.setEnabled(false),
+    onClose: () => {
+      input.setEnabled(started && textMode.hidden);
+      canvas.focus();
+    },
+    onParty: toggleParty,
+  });
+  const konami = konamiDetector(() => {
+    secrets.unlock('konami');
+    toggleParty();
   });
 
   function discover(station) {
@@ -152,6 +237,7 @@ async function main() {
     startScreen.classList.add('hidden');
     document.body.classList.add('playing');
     input.setEnabled(true);
+    player.idle = 0;
     canvas.focus();
   }
   $('#play-btn').addEventListener('click', startGame);
@@ -171,10 +257,29 @@ async function main() {
   document.querySelectorAll('[data-open-text]').forEach((b) => b.addEventListener('click', openText));
   $('#textmode-close').addEventListener('click', closeText);
   window.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape' && terminal.isOpen) return terminal.close();
+    if (e.code === 'Backquote' && started && textMode.hidden) {
+      e.preventDefault();
+      return terminal.isOpen ? terminal.close() : terminal.open();
+    }
+    if (started && textMode.hidden && !terminal.isOpen) konami(e.code);
     if (e.code === 'Escape' && !textMode.hidden) closeText();
     if (!started && textMode.hidden && (e.code === 'Enter' || e.code === 'Space') && document.activeElement === document.body) {
       e.preventDefault();
       startGame();
+    }
+  });
+
+  // 5 toques seguidos en el nombre abren la terminal (para móvil)
+  let badgeTaps = 0;
+  let badgeTimer = null;
+  $('.badge').addEventListener('click', () => {
+    if (!started) return;
+    clearTimeout(badgeTimer);
+    badgeTimer = setTimeout(() => (badgeTaps = 0), 1500);
+    if (++badgeTaps >= 5) {
+      badgeTaps = 0;
+      terminal.open();
     }
   });
 
@@ -185,7 +290,7 @@ async function main() {
   window.addEventListener(
     'wheel',
     (e) => {
-      if (!started || !textMode.hidden) return;
+      if (!started || !textMode.hidden || terminal.isOpen) return;
       zoomTarget = Math.min(1.8, Math.max(0.6, zoomTarget + Math.sign(e.deltaY) * 0.1));
     },
     { passive: true }
@@ -217,6 +322,31 @@ async function main() {
 
     player.update(dt, input, colliders, groundAt, walkLimit, sfx);
     skillCubes.update(dt, player, colliders, groundAt, edgeAt, sfx);
+
+    // Minijuego: goles en la portería escondida
+    for (const c of skillCubes.cubes) {
+      if (c.scored > 0) {
+        c.scored -= dt;
+        if (c.scored <= 0) skillCubes.respawn(c);
+      } else if (!c.sinking && goal.contains(c.pos)) {
+        c.scored = 1.2;
+        scoreGoal(c);
+      }
+    }
+    if (started) {
+      floppies.update(elapsed, player, pickFloppy);
+      if (player.face === 'sleep') secrets.unlock('siesta');
+    }
+    if (party) {
+      player.shirt.color.setHSL((elapsed * 0.4) % 1, 0.85, 0.6);
+      partyTimer -= dt;
+      if (partyTimer <= 0) {
+        partyTimer = 0.4;
+        const p = new THREE.Vector3(player.pos.x + (Math.random() - 0.5) * 8, 3 + Math.random() * 3, player.pos.z + (Math.random() - 0.5) * 8);
+        const hue = new THREE.Color().setHSL(Math.random(), 0.9, 0.6).getHex();
+        bursts.spawn(p, [hue, 0xffffff], 22, { speed: 5, up: 3 });
+      }
+    }
 
     // ¿Sobre qué pedestal está?
     let nextActive = null;
@@ -283,6 +413,12 @@ async function main() {
   $('#play-btn').disabled = false;
   $('#play-btn').textContent = discovered.size ? 'Seguir jugando' : 'Jugar';
 }
+
+console.log(
+  '%c elordenador %c ¿Curioseando el código? Esta isla esconde unos cuantos secretos. Pista: la tecla º (o `).',
+  'font: 700 14px monospace; background: #1d1b2a; color: #5dff8a; padding: 4px 8px; border-radius: 4px',
+  'font: 13px sans-serif; color: inherit'
+);
 
 main().catch((err) => {
   console.error(err);
