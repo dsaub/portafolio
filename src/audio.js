@@ -77,6 +77,16 @@ export const sfx = {
   },
   eat: () => tone(660, 0.06, { type: 'square', vol: 0.04, to: 990 }),
   over: () => tone(330, 0.5, { type: 'sawtooth', vol: 0.05, to: 80 }),
+  // Náufrago
+  bonk: () => {
+    tone(180, 0.18, { type: 'square', vol: 0.12, to: 60 });
+    noise(0.12, 0.15, 900);
+    tone(1400, 0.5, { type: 'sine', vol: 0.03, to: 1200, delay: 0.1 });
+  },
+  uga: () => {
+    tone(150, 0.22, { type: 'square', vol: 0.06, to: 110 });
+    tone(130, 0.3, { type: 'square', vol: 0.06, to: 90, delay: 0.26 });
+  },
   // Modo destrucción
   alarm: () => {
     for (let i = 0; i < 3; i++) {

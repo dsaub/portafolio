@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import './style.css';
 import { profile, projects, skills } from './data.js';
-import { buildWorld, terrainHeight, walkLimit, islandEdge, stationAngle, PLAZA_R, GOAL_ANGLE, GOAL_R } from './world.js';
+import { buildWorld, terrainHeight, walkLimit, isLand, islandEdge, stationAngle, PLAZA_R, GOAL_ANGLE, GOAL_R } from './world.js';
 import { buildStations, PAD_R } from './stations.js';
 import { Player } from './player.js';
 import { buildSkills } from './skills.js';
@@ -16,6 +16,7 @@ import { buildGoal } from './goal.js';
 import { buildFloppies } from './floppies.js';
 import { buildNote, NOTE_CMD } from './note.js';
 import { createDestruction } from './destruction.js';
+import { createSea } from './sea.js';
 
 const STORAGE_KEY = 'elordenador-discovered';
 const ABOUT_POS = [0, -6.3];
@@ -154,6 +155,9 @@ async function main() {
     onKill: (e) => terminal.removed(e.kind === 'tree' ? `/isla/arboles/arbol_${String(e.i).padStart(3, '0')}` : `/isla/rocas/roca_${String(e.i).padStart(3, '0')}`),
     onPhase: (phase) => (phase === 'win' ? terminal.finishWin() : terminal.finishLose()),
   });
+  const sea = createSea({ scene, player, bursts, sfx, hud, secrets });
+  // Fuera del minijuego puedes llegar hasta el agua (y caerte)
+  const playerLimit = (x, z) => (destruction.busy ? walkLimit(x, z) : edgeAt(x, z) + 2.5);
   const noInput = { axis: () => ({ x: 0, z: 0 }), running: () => false, consumeJump: () => false };
   const readNote = () => {
     hud.toast(`<strong>Nota del sysadmin:</strong> «Pase lo que pase, NUNCA escribas <code>${NOTE_CMD}</code> en la terminal. La isla no lo perdonaría.»`, 9000);
@@ -289,7 +293,7 @@ async function main() {
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape' && terminal.isOpen) return terminal.close();
     if (e.code === 'KeyF' && destruction.active && textMode.hidden && !e.repeat) return destruction.fire();
-    if (e.code === 'Backquote' && started && textMode.hidden && !destruction.busy) {
+    if (e.code === 'Backquote' && started && textMode.hidden && !destruction.busy && !sea.busy) {
       e.preventDefault();
       return terminal.isOpen ? terminal.close() : terminal.open();
     }
@@ -305,7 +309,7 @@ async function main() {
   let badgeTaps = 0;
   let badgeTimer = null;
   $('.badge').addEventListener('click', () => {
-    if (!started || destruction.busy) return;
+    if (!started || destruction.busy || sea.busy) return;
     clearTimeout(badgeTimer);
     badgeTimer = setTimeout(() => (badgeTaps = 0), 1500);
     if (++badgeTaps >= 5) {
@@ -356,7 +360,9 @@ async function main() {
     const dt = Math.min(timer.getDelta(), 0.05);
     elapsed += dt;
 
-    player.update(dt, destruction.locked ? noInput : input, colliders, groundAt, walkLimit, sfx);
+    player.update(dt, destruction.locked || sea.busy ? noInput : input, colliders, groundAt, playerLimit, sfx);
+    if (started && textMode.hidden && !destruction.busy && !sea.busy && !isLand(player.pos.x, player.pos.z)) sea.trigger();
+    if (textMode.hidden) sea.update(dt);
     skillCubes.update(dt, player, colliders, groundAt, edgeAt, sfx);
     if (textMode.hidden) destruction.update(dt, skillCubes.cubes);
 
@@ -371,8 +377,8 @@ async function main() {
       }
     }
     if (started) {
-      floppies.update(elapsed, player, pickFloppy);
-      if (!destruction.busy) note.update(player, readNote);
+      if (!sea.busy) floppies.update(elapsed, player, pickFloppy);
+      if (!destruction.busy && !sea.busy) note.update(player, readNote);
       if (player.face === 'sleep') secrets.unlock('siesta');
     }
     if (party) {
@@ -429,7 +435,7 @@ async function main() {
       lookAt.y = damp(lookAt.y, camTarget.y + 1, 6, dt);
       lookAt.z = damp(lookAt.z, camTarget.z, 6, dt);
       camera.lookAt(lookAt);
-      const sh = destruction.shake;
+      const sh = Math.max(destruction.shake, sea.shake);
       if (sh > 0) {
         camera.position.x += (Math.random() - 0.5) * sh;
         camera.position.y += (Math.random() - 0.5) * sh;

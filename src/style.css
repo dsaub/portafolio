@@ -643,6 +643,18 @@ body.rm-glitch #scene { animation: rm-glitch 0.7s steps(2) both; }
   body.rm-glitch #scene { animation: none; }
 }
 
+/* Fundido a negro tras el garrotazo del cavernícola */
+.sea-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s;
+}
+.sea-fade.show { opacity: 1; }
+
 /* ---------- Pantallas pequeñas ---------- */
 @media (max-width: 640px) {
   .badge-name { font-size: 1.1rem; }

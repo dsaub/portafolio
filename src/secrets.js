@@ -11,6 +11,8 @@ export const SECRETS = [
   { id: 'chapuzon', name: 'Chapuzón', hint: 'A los cubos también les gusta el mar (5 veces)' },
   { id: 'siesta', name: 'Siesta', hint: 'Deja al ordenador tranquilo un rato' },
   { id: 'disquetes', name: 'Coleccionista', hint: 'Hay 5 disquetes perdidos por la isla' },
+  { id: 'hundido', name: 'Glu glu… ¡BOOM!', hint: 'El mar no es buen sitio para un ordenador' },
+  { id: 'naufrago', name: 'Náufrago', hint: 'Métete al mar… a veces la marea te lleva muy lejos (1 de cada 10)' },
   { id: 'nota', name: 'Nota del sysadmin', hint: 'Alguien dejó una nota clavada en la playa del norte' },
   { id: 'rmrf', name: 'Destrucción masiva', hint: 'Escribe el comando prohibido… y gana a la isla' },
   { id: 'panic', name: 'Kernel panic', hint: 'Escribe el comando prohibido… y deja que la isla te gane' },

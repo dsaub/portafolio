@@ -32,6 +32,8 @@ export function terrainHeight(x, z) {
 }
 
 export const walkLimit = (x, z) => islandEdge(angleOf(x, z)) - 1.6;
+// ¿Hay un bloque de tierra bajo este punto? (si no, es mar)
+export const isLand = (x, z) => cellKind(Math.round(x / CELL) * CELL, Math.round(z / CELL) * CELL) !== null;
 
 export function distToPath(x, z, angle) {
   const dx = Math.sin(angle), dz = -Math.cos(angle);
