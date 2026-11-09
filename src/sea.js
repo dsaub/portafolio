@@ -1,9 +1,12 @@
 import * as THREE from 'three';
 import { mat } from './util.js';
+import { box, buildPalm, buildCaveman } from './caveman.js';
 
 // Si te metes en el mar te hundes y explotas. Con un 10 % de probabilidad, en cambio,
 // la marea te arrastra (hundido) hasta una isla desierta donde vive un cavernícola…
+// …que al 50 % te aplasta o se enamora de ti y te secuestra (ver ugg/island.js)
 const RARE_CHANCE = 0.1;
+const LOVE_CHANCE = 0.5;
 const DRIFT_SPEED = 6;
 const DRIFT_TIME = 4;
 const ISLAND_R = 5;
@@ -13,13 +16,6 @@ const smooth = (v) => {
   const x = Math.min(1, Math.max(0, v));
   return x * x * (3 - 2 * x);
 };
-
-function box(w, h, d, m, x = 0, y = 0, z = 0) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-  mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  return mesh;
-}
 
 // Islote de arena con una palmera; el -z local apunta "hacia dentro" (lejos de donde llegas)
 function buildIsland() {
@@ -32,35 +28,8 @@ function buildIsland() {
   wet.position.y = -0.8;
   g.add(wet);
 
-  // Palmera inclinada
-  const palm = new THREE.Group();
+  const palm = buildPalm();
   palm.position.set(0.8, 0, -2.2);
-  const trunk = mat(0x9c6b3c);
-  let top = new THREE.Vector3();
-  for (let i = 0; i < 6; i++) {
-    const seg = box(0.42 - i * 0.02, 0.62, 0.42 - i * 0.02, trunk, i * i * 0.035, 0.31 + i * 0.6, 0);
-    seg.rotation.z = -0.06 * i;
-    palm.add(seg);
-    top.set(i * i * 0.035, 0.62 + i * 0.6, 0);
-  }
-  const leaf = mat(0x3f9b3a);
-  for (let i = 0; i < 7; i++) {
-    const pivot = new THREE.Group();
-    pivot.position.copy(top);
-    pivot.rotation.y = (i / 7) * Math.PI * 2;
-    const l = box(2.3, 0.1, 0.55, leaf, 1.05, 0, 0);
-    l.rotation.z = -0.45;
-    pivot.add(l);
-    palm.add(pivot);
-  }
-  const coco = mat(0x5a3a1a);
-  for (let i = 0; i < 3; i++) {
-    const c = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), coco);
-    const a = (i / 3) * Math.PI * 2;
-    c.position.set(top.x + Math.cos(a) * 0.25, top.y - 0.25, Math.sin(a) * 0.25);
-    c.castShadow = true;
-    palm.add(c);
-  }
   g.add(palm);
 
   // Unas rocas y un hueso (mala señal)
@@ -81,70 +50,7 @@ function buildIsland() {
   return g;
 }
 
-function buildCaveman() {
-  const g = new THREE.Group();
-  const skin = mat(0xd9a066);
-  const fur = mat(0x8b5a2b);
-  const furDark = mat(0x5e3b1c);
-  const hair = mat(0x2b1d14);
-  const white = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const black = new THREE.MeshBasicMaterial({ color: 0x111111 });
-
-  const legs = [-0.2, 0.2].map((x) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, 0.72, 0);
-    pivot.add(box(0.3, 0.72, 0.32, skin, 0, -0.36, 0), box(0.34, 0.14, 0.44, furDark, 0, -0.68, 0.05));
-    g.add(pivot);
-    return pivot;
-  });
-  // Túnica de piel con manchas
-  g.add(box(1, 0.9, 0.58, fur, 0, 1.15, 0));
-  for (const [x, y] of [[-0.25, 1.3], [0.22, 0.98], [0.3, 1.4]]) g.add(box(0.18, 0.14, 0.04, furDark, x, y, 0.3));
-  g.add(box(0.3, 0.9, 0.6, skin, -0.36, 1.25, 0)); // hombro al aire
-  const arms = [-0.64, 0.64].map((x) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, 1.55, 0);
-    pivot.add(box(0.27, 0.68, 0.3, skin, 0, -0.32, 0));
-    g.add(pivot);
-    return pivot;
-  });
-  // Garrote en la mano derecha
-  const club = new THREE.Group();
-  const wood = mat(0x7a4a2a);
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.9, 6), wood);
-  handle.position.y = 0.45;
-  const head = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.16, 0.55, 7), wood);
-  head.position.y = 1.05;
-  handle.castShadow = head.castShadow = true;
-  club.add(handle, head);
-  club.position.set(0, -0.68, 0.05);
-  club.rotation.x = Math.PI / 2.4;
-  arms[1].add(club);
-
-  // Cabeza: pelo enmarañado, uniceja y barba
-  const headG = new THREE.Group();
-  headG.position.y = 2;
-  headG.add(
-    box(0.76, 0.72, 0.7, skin),
-    box(0.9, 0.36, 0.84, hair, 0, 0.42, -0.02),
-    box(0.9, 0.6, 0.3, hair, 0, 0.05, -0.32),
-    box(0.74, 0.34, 0.16, hair, 0, -0.3, 0.33),
-    box(0.58, 0.08, 0.06, hair, 0, 0.16, 0.36),
-    box(0.14, 0.18, 0.14, skin, 0, -0.02, 0.4)
-  );
-  for (const x of [-0.17, 0.17]) {
-    const eye = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.04), white);
-    eye.position.set(x, 0.06, 0.36);
-    const pupil = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.04), black);
-    pupil.position.set(x, 0.05, 0.37);
-    headG.add(eye, pupil);
-  }
-  g.add(headG);
-  g.visible = false;
-  return { group: g, legs, arms, head: headG };
-}
-
-export function createSea({ scene, player, bursts, sfx, hud, secrets }) {
+export function createSea({ scene, player, bursts, sfx, hud, secrets, onCapture = () => {} }) {
   const island = buildIsland();
   const cave = buildCaveman();
   scene.add(island, cave.group);
@@ -157,7 +63,11 @@ export function createSea({ scene, player, bursts, sfx, hud, secrets }) {
   let shake = 0;
   let exploded = false;
   let bubbleT = 0;
-  let hitT = -1; // momento en que empieza el garrotazo
+  let hitT = -1; // momento en que empieza el garrotazo (o el flechazo)
+  let love = false;
+  let loveStarted = false;
+  let heartT = 0;
+  let caveY = 0.05;
   let respawnAt = Infinity;
   const said = new Set();
   const p = new THREE.Vector3();
@@ -206,14 +116,19 @@ export function createSea({ scene, player, bursts, sfx, hud, secrets }) {
       cave.group.position.copy(caveP);
       cave.group.visible = false;
       cave.arms.forEach((a) => (a.rotation.x = 0));
+      cave.club.visible = true;
+      cave.setLove(false);
+      love = Math.random() < LOVE_CHANCE;
+      loveStarted = false;
+      caveY = 0.05;
     }
   }
 
-  function respawn() {
+  function respawn(toPlaza = true) {
     mode = 'off';
     island.visible = false;
     cave.group.visible = false;
-    player.pos.set(0, 0, 3);
+    if (toPlaza) player.pos.set(0, 0, 3);
     player.vel.set(0, 0, 0);
     player.vy = 0;
     player.root.position.copy(player.pos);
@@ -301,6 +216,8 @@ export function createSea({ scene, player, bursts, sfx, hud, secrets }) {
       }
       cave.group.rotation.y = Math.atan2(dx, dz);
       cave.group.position.set(caveP.x, 0.05 + Math.abs(Math.sin(T * 10)) * 0.08, caveP.z);
+    } else if (love) {
+      updateLove(dt);
     } else {
       // Garrotazo
       const k = T - hitT;
@@ -327,6 +244,50 @@ export function createSea({ scene, player, bursts, sfx, hud, secrets }) {
           secrets.unlock('naufrago');
         }
       }
+    }
+  }
+
+  // Flechazo: suelta el garrote, ojos de corazón, te coge en brazos y se lanza al mar
+  function updateLove(dt) {
+    const k = T - hitT;
+    if (!loveStarted) {
+      loveStarted = true;
+      cave.club.visible = false;
+      cave.setLove(true);
+      sfx.love();
+      player.setFace('wow', Infinity);
+      bursts.spawn(new THREE.Vector3(caveP.x, 2.4, caveP.z), [0xff4d8d, 0xff8ab5, 0xffffff], 40, { speed: 4, up: 5 });
+      hud.toast('<strong>Ugg</strong> suelta el garrote… y se queda mirándote ♥', 2600);
+    }
+    heartT -= dt;
+    if (heartT <= 0) {
+      heartT = 0.22;
+      bursts.spawn(new THREE.Vector3(caveP.x, caveY + 2.8, caveP.z), [0xff4d8d, 0xff8ab5, 0xffffff], 5, { speed: 2, up: 3, gravity: -1 });
+    }
+    if (k < 2.8) {
+      // Saltitos de felicidad
+      cave.group.position.set(caveP.x, 0.05 + Math.abs(Math.sin(T * 8)) * 0.45, caveP.z);
+      cave.arms[0].rotation.x = cave.arms[1].rotation.x = -2.6 + Math.sin(T * 8) * 0.3;
+      if (k > 1.3) say('love2', '«UGG ENAMORADO. TÚ SER DE UGG. PARA SIEMPRE.» ♥', 3200);
+    } else if (k < 4.8) {
+      // Te coge en brazos y se tira al mar contigo
+      cave.arms[0].rotation.x = cave.arms[1].rotation.x = -2.9;
+      caveP.addScaledVector(dir, 4.5 * dt);
+      const inSea = Math.hypot(caveP.x - center.x, caveP.z - center.z) > ISLAND_R + 0.4;
+      caveY = inSea ? Math.max(-2.6, caveY - dt * 4) : 0.05 + Math.abs(Math.sin(T * 10)) * 0.1;
+      cave.group.rotation.y = Math.atan2(dir.x, dir.z);
+      cave.group.position.set(caveP.x, caveY, caveP.z);
+      p.set(caveP.x, caveY + 2.8, caveP.z);
+      player.root.rotation.x = -Math.PI / 2;
+      player.setFace('ko', Infinity);
+      if (inSea) bubbles(dt, 0.2);
+      if (k > 3.8) fade.classList.add('show');
+    } else {
+      respawn(false);
+      cave.setLove(false);
+      onCapture();
+      setTimeout(() => fade.classList.remove('show'), 400);
+      secrets.unlock('naufrago');
     }
   }
 

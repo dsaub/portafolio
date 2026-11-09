@@ -17,6 +17,7 @@ import { buildFloppies } from './floppies.js';
 import { buildNote, NOTE_CMD } from './note.js';
 import { createDestruction } from './destruction.js';
 import { createSea } from './sea.js';
+import { createUggIsland } from './ugg/island.js';
 
 const STORAGE_KEY = 'elordenador-discovered';
 const ABOUT_POS = [0, -6.3];
@@ -155,9 +156,11 @@ async function main() {
     onKill: (e) => terminal.removed(e.kind === 'tree' ? `/isla/arboles/arbol_${String(e.i).padStart(3, '0')}` : `/isla/rocas/roca_${String(e.i).padStart(3, '0')}`),
     onPhase: (phase) => (phase === 'win' ? terminal.finishWin() : terminal.finishLose()),
   });
-  const sea = createSea({ scene, player, bursts, sfx, hud, secrets });
+  const sea = createSea({ scene, player, bursts, sfx, hud, secrets, onCapture: () => ugg.capture() });
+  // La isla de Ugg: si te secuestra, no vuelves (ni recargando) hasta escapar
+  const ugg = createUggIsland({ scene, colliders, player, bursts, sfx, hud, secrets, input: { setEnabled: (v) => input.setEnabled(v && started) }, onEscaped: () => (fireworks = 4) });
   // Fuera del minijuego puedes llegar hasta el agua (y caerte)
-  const playerLimit = (x, z) => (destruction.busy ? walkLimit(x, z) : edgeAt(x, z) + 2.5);
+  const playerLimit = (x, z) => (ugg.active ? Infinity : destruction.busy ? walkLimit(x, z) : edgeAt(x, z) + 2.5);
   const noInput = { axis: () => ({ x: 0, z: 0 }), running: () => false, consumeJump: () => false };
   const readNote = () => {
     hud.toast(`<strong>Nota del sysadmin:</strong> «Pase lo que pase, NUNCA escribas <code>${NOTE_CMD}</code> en la terminal. La isla no lo perdonaría.»`, 9000);
@@ -205,6 +208,7 @@ async function main() {
   }
 
   const interact = () => {
+    if (ugg.active) return ugg.interact();
     if (destruction.active) return destruction.fire();
     if (!activeId) return;
     const url = activeId === 'about' ? profile.github : projects.find((p) => p.id === activeId).repo;
@@ -272,6 +276,7 @@ async function main() {
     document.body.classList.add('playing');
     input.setEnabled(true);
     player.idle = 0;
+    if (ugg.hasSaved()) ugg.enter(false); // recargar no te salva de Ugg
     canvas.focus();
   }
   $('#play-btn').addEventListener('click', startGame);
@@ -293,6 +298,7 @@ async function main() {
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape' && terminal.isOpen) return terminal.close();
     if (e.code === 'KeyF' && destruction.active && textMode.hidden && !e.repeat) return destruction.fire();
+    if (e.code === 'Backquote' && ugg.active) return hud.toast('Aquí no hay terminal secreta… pero Ugg tiene un ordenador. ♥');
     if (e.code === 'Backquote' && started && textMode.hidden && !destruction.busy && !sea.busy) {
       e.preventDefault();
       return terminal.isOpen ? terminal.close() : terminal.open();
@@ -309,7 +315,7 @@ async function main() {
   let badgeTaps = 0;
   let badgeTimer = null;
   $('.badge').addEventListener('click', () => {
-    if (!started || destruction.busy || sea.busy) return;
+    if (!started || destruction.busy || sea.busy || ugg.active) return;
     clearTimeout(badgeTimer);
     badgeTimer = setTimeout(() => (badgeTaps = 0), 1500);
     if (++badgeTaps >= 5) {
@@ -360,9 +366,10 @@ async function main() {
     const dt = Math.min(timer.getDelta(), 0.05);
     elapsed += dt;
 
-    player.update(dt, destruction.locked || sea.busy ? noInput : input, colliders, groundAt, playerLimit, sfx);
-    if (started && textMode.hidden && !destruction.busy && !sea.busy && !isLand(player.pos.x, player.pos.z)) sea.trigger();
+    player.update(dt, destruction.locked || sea.busy || ugg.locked ? noInput : input, colliders, groundAt, playerLimit, sfx);
+    if (started && textMode.hidden && !destruction.busy && !sea.busy && !ugg.active && !isLand(player.pos.x, player.pos.z)) sea.trigger();
     if (textMode.hidden) sea.update(dt);
+    if (textMode.hidden) ugg.update(dt, elapsed);
     skillCubes.update(dt, player, colliders, groundAt, edgeAt, sfx);
     if (textMode.hidden) destruction.update(dt, skillCubes.cubes);
 
@@ -377,8 +384,8 @@ async function main() {
       }
     }
     if (started) {
-      if (!sea.busy) floppies.update(elapsed, player, pickFloppy);
-      if (!destruction.busy && !sea.busy) note.update(player, readNote);
+      if (!sea.busy && !ugg.active) floppies.update(elapsed, player, pickFloppy);
+      if (!destruction.busy && !sea.busy && !ugg.active) note.update(player, readNote);
       if (player.face === 'sleep') secrets.unlock('siesta');
     }
     if (party) {
@@ -451,7 +458,7 @@ async function main() {
     sun.position.copy(player.pos).add(SUN_OFFSET);
     sun.target.position.copy(player.pos);
 
-    if (started && ++miniFrame % 2 === 0) hud.drawMinimap(player, stations, discovered, ABOUT_POS, elapsed, destruction.dots());
+    if (started && !ugg.active && ++miniFrame % 2 === 0) hud.drawMinimap(player, stations, discovered, ABOUT_POS, elapsed, destruction.dots());
 
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
@@ -460,7 +467,7 @@ async function main() {
 
   document.body.classList.add('ready');
   $('#play-btn').disabled = false;
-  $('#play-btn').textContent = discovered.size ? 'Seguir jugando' : 'Jugar';
+  $('#play-btn').textContent = ugg.hasSaved() ? 'Volver con Ugg ♥' : discovered.size ? 'Seguir jugando' : 'Jugar';
 }
 
 console.log(

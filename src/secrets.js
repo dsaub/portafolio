@@ -16,6 +16,18 @@ export const SECRETS = [
   { id: 'nota', name: 'Nota del sysadmin', hint: 'Alguien dejó una nota clavada en la playa del norte' },
   { id: 'rmrf', name: 'Destrucción masiva', hint: 'Escribe el comando prohibido… y gana a la isla' },
   { id: 'panic', name: 'Kernel panic', hint: 'Escribe el comando prohibido… y deja que la isla te gane' },
+  // Isla de Ugg: sin pistas, hay que averiguarlos
+  { id: 'ugg_amor', name: 'Amor prehistórico', group: 'ugg' },
+  { id: 'ugg_win', name: 'Ventanas para Ugg', group: 'ugg' },
+  { id: 'ugg_login', name: 'Usuario de UGGNIX', group: 'ugg' },
+  { id: 'ugg_arcade', name: 'Jugón del Paleolítico', group: 'ugg' },
+  { id: 'ugg_cofre', name: 'El cofre de Ugg', group: 'ugg' },
+  { id: 'ugg_nana', name: 'Duérmete, Ugg', group: 'ugg' },
+  { id: 'ugg_escape', name: 'Libre otra vez', group: 'ugg' },
+  { id: 'ugg_bug', name: 'El bug del 2,01', group: 'ugg' },
+  { id: 'ugg_gpf', name: 'Fallo de protección general', group: 'ugg' },
+  { id: 'ugg_format', name: 'Formatear el amor', group: 'ugg' },
+  { id: 'ugg_nadar', name: 'Ugg siempre vigila', group: 'ugg' },
 ];
 
 function load() {

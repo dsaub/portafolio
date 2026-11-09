@@ -123,8 +123,15 @@ export function createTerminal({ profile, projects, secrets, onOpen, onClose, on
       desc: 'secretos encontrados',
       run() {
         print(`Secretos: <b>${secrets.count}/${secrets.total}</b>`);
-        for (const s of secrets.list()) {
+        const all = secrets.list();
+        for (const s of all.filter((x) => !x.group)) {
           print(s.found ? `  <span class="ok">[✓]</span> ${esc(s.name)}` : `  <span class="dim">[ ] ??? — ${esc(s.hint)}</span>`);
+        }
+        // La sección de Ugg solo aparece tras el primer secuestro, y sin pistas
+        if (secrets.has('ugg_amor')) {
+          print('');
+          print('Isla de Ugg (sin pistas):');
+          for (const s of all.filter((x) => x.group === 'ugg')) print(s.found ? `  <span class="ok">[✓]</span> ${esc(s.name)}` : '  <span class="dim">[ ] ???</span>');
         }
       },
     },

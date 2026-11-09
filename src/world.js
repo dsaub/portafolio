@@ -110,7 +110,7 @@ export function buildWorld(scene, stationAngles) {
          transformed.z += sin(position.x * 0.35 + uTime * 1.2) * 0.18 + cos(position.y * 0.3 + uTime) * 0.18;`
       );
   };
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(400, 400, 110, 110), waterMat);
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(900, 900, 220, 220), waterMat);
   water.rotation.x = -Math.PI / 2;
   water.position.y = -0.75;
   water.receiveShadow = true;

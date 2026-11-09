@@ -55,7 +55,63 @@ function noise(dur, vol = 0.1, freq = 800) {
   src.start();
 }
 
+// Melodía programada que se puede parar; si está en silencio dura lo mismo (para los puzles)
+export function playMelody(notes, { beat = 0.42, type = 'triangle', vol = 0.07 } = {}) {
+  const nodes = [];
+  let t = 0;
+  const start = ctx && !muted ? ctx.currentTime + 0.05 : 0;
+  for (const [freq, beats] of notes) {
+    const dur = beats * beat;
+    if (ctx && !muted && freq) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, start + t);
+      gain.gain.setValueAtTime(0.0001, start + t);
+      gain.gain.exponentialRampToValueAtTime(vol, start + t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + t + dur * 0.95);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start + t);
+      osc.stop(start + t + dur);
+      nodes.push(osc);
+    }
+    t += dur;
+  }
+  return {
+    duration: t,
+    stop() {
+      for (const o of nodes) {
+        try {
+          o.stop();
+        } catch {}
+      }
+    },
+  };
+}
+
+// Canción de cuna de Brahms (dominio público): la nana de la madre de Ugg
+const [C4, D4, E4, F4, G4, A4, B4, C5] = [261.63, 293.66, 329.63, 349.23, 392, 440, 493.88, 523.25];
+export const NANA = [
+  [E4, 1], [E4, 1], [G4, 2], [E4, 1], [E4, 1], [G4, 2],
+  [E4, 1], [G4, 1], [C5, 1.5], [B4, 0.5], [A4, 1], [A4, 1], [G4, 2],
+  [D4, 1], [E4, 1], [F4, 2], [D4, 1], [D4, 1], [E4, 1], [F4, 2],
+  [D4, 1], [F4, 1], [B4, 0.5], [A4, 0.5], [G4, 1], [B4, 1], [C5, 3],
+];
+
 export const sfx = {
+  // Ugg y UGGDOWS
+  love: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.3, { type: 'sine', vol: 0.06, delay: i * 0.09 })),
+  ding: () => tone(1200, 0.12, { type: 'square', vol: 0.03 }),
+  boot: () => [C4, E4, G4, C5].forEach((f, i) => tone(f * 2, 0.5, { type: 'triangle', vol: 0.05, delay: i * 0.12 })),
+  floppy: () => {
+    for (let i = 0; i < 6; i++) noise(0.05, 0.05, 2500 + (i % 2) * 800);
+    tone(90, 0.3, { type: 'square', vol: 0.02, delay: 0.1 });
+  },
+  chain: () => {
+    noise(0.3, 0.12, 4000);
+    tone(1800, 0.15, { type: 'square', vol: 0.02 });
+  },
+  denied: () => tone(140, 0.25, { type: 'square', vol: 0.05 }),
   jump: () => tone(300, 0.16, { to: 640, vol: 0.04 }),
   kick: () => {
     tone(160, 0.12, { type: 'sine', to: 60, vol: 0.18 });
