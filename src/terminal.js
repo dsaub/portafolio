@@ -1,5 +1,7 @@
 // Terminal secreta (tecla º / ` o 5 toques en el nombre) con un Snake dentro
 import { sfx } from './audio.js';
+import { NOTE_CMD } from './note.js';
+import { deletionStream, rmLine, RM_BUSY } from './rmlog.js';
 
 const BEST_KEY = 'elordenador-snake-best';
 const esc = (s) =>
@@ -13,7 +15,7 @@ const NEOFETCH_ART = [
   '   ══╧════╧══  ',
 ];
 
-export function createTerminal({ profile, projects, secrets, onOpen, onClose, onParty }) {
+export function createTerminal({ profile, projects, secrets, onOpen, onClose, onParty, onDestroy }) {
   const root = document.createElement('section');
   root.className = 'term';
   root.hidden = true;
@@ -23,7 +25,7 @@ export function createTerminal({ profile, projects, secrets, onOpen, onClose, on
   root.innerHTML = `
     <div class="term-win">
       <div class="term-bar">
-        <span>daniel@isla: ~</span>
+        <span class="term-title">daniel@isla: ~</span>
         <button type="button" class="term-x" aria-label="Cerrar terminal">×</button>
       </div>
       <div class="term-body">
@@ -54,6 +56,7 @@ export function createTerminal({ profile, projects, secrets, onOpen, onClose, on
     line.className = 'term-l' + (cls ? ' ' + cls : '');
     line.innerHTML = html;
     out.appendChild(line);
+    while (out.childElementCount > 300) out.firstChild.remove();
     body.scrollTop = body.scrollHeight;
   };
   const link = (url, text = url.replace(/^https?:\/\//, '')) =>
@@ -72,7 +75,7 @@ export function createTerminal({ profile, projects, secrets, onOpen, onClose, on
     whoami: { desc: 'quién soy', run: () => print(`${profile.name.toLowerCase()} (aka ${profile.alias}) · ${esc(profile.role)}`) },
     ls: {
       desc: 'lista archivos',
-      run: () => print('<b>proyectos/</b>  <b>secretos/</b>  sobre-mi.txt  snake*'),
+      run: () => print(`<b>proyectos/</b>  <b>secretos/</b>  sobre-mi.txt  snake*${secrets.has('nota') ? '  nota.txt' : ''}`),
     },
     cat: {
       desc: 'muestra un archivo',
@@ -84,7 +87,11 @@ export function createTerminal({ profile, projects, secrets, onOpen, onClose, on
           print(link(profile.github));
         } else if (f === 'proyectos') commands.proyectos.run();
         else if (f === 'secretos') commands.logros.run();
-        else if (f === 'snake') print('cat: snake: es un binario. Mejor ejecútalo: <b>snake</b>', 'dim');
+        else if (f === 'nota.txt' && secrets.has('nota')) {
+          print('NOTA DEL SYSADMIN', 'err');
+          print(`Pase lo que pase, NUNCA escribas <b>${esc(NOTE_CMD)}</b> en esta terminal.`);
+          print('La isla no lo perdonaría. — el sysadmin', 'dim');
+        } else if (f === 'snake') print('cat: snake: es un binario. Mejor ejecútalo: <b>snake</b>', 'dim');
         else if (!f) print('uso: cat &lt;archivo&gt;', 'err');
         else print(`cat: ${esc(f)}: No existe el archivo o el directorio`, 'err');
       },
@@ -140,10 +147,26 @@ export function createTerminal({ profile, projects, secrets, onOpen, onClose, on
         if (!args.length) return print('uso: sudo &lt;comando&gt;', 'err');
         print('[sudo] contraseña para daniel: ********', 'dim');
         print('daniel no está en el archivo sudoers. Este incidente será reportado. 🚨', 'err');
+        if (args.join(' ') === NOTE_CMD) print('…aunque para eso no te hace falta sudo 👀', 'dim');
         secrets.unlock('sudo');
       },
     },
-    rm: { hidden: true, run: () => print('rm: buen intento 😏 (prueba con sudo)', 'err') },
+    rm: {
+      hidden: true,
+      run(args) {
+        const line = args.join(' ');
+        if (line === NOTE_CMD.slice(3)) return destroyAll();
+        const recursive = args.some((a) => /^-[a-z]*r/i.test(a) || a === '--recursive');
+        if (recursive && args.includes('/')) {
+          if (args.includes('--no-preserve-root')) return print('rm: casi… pero tiene que ser exactamente como en la nota 😉', 'err');
+          print("rm: es peligroso operar recursivamente sobre '/'", 'err');
+          print('rm: use --no-preserve-root para anular esta protección', 'err');
+          return;
+        }
+        if (!args.length) return print('rm: falta un operando', 'err');
+        print('rm: buen intento 😏', 'err');
+      },
+    },
     vim: { hidden: true, run: () => print('Llevas 3 años intentando salir de vim. Pista: <b>:q!</b>', 'dim') },
     ':q!': { hidden: true, run: () => print('¿Ves? No era tan difícil.', 'ok') },
     cd: { hidden: true, run: () => print('Ya estás en la isla. No hay a dónde ir 🏝️') },
@@ -151,6 +174,49 @@ export function createTerminal({ profile, projects, secrets, onOpen, onClose, on
   };
   commands.ayuda = { ...commands.help, hidden: true };
   commands.quit = { ...commands.exit, hidden: true };
+
+  // rm -rf --no-preserve-root /: la terminal se va a segundo plano (arriba a la
+  // izquierda) y sigue "borrando" el sistema mientras el minijuego arranca ya
+  let background = false;
+  let streamTimer = null;
+  const title = root.querySelector('.term-title');
+
+  function destroyAll() {
+    if (background) return;
+    background = true;
+    field.disabled = true;
+    field.blur();
+    root.classList.add('term-bg');
+    root.setAttribute('aria-modal', 'false');
+    title.textContent = 'root@isla: / — rm -rf --no-preserve-root /';
+    onClose();
+    onDestroy();
+    const stream = deletionStream(projects);
+    const tick = () => {
+      // ráfagas irregulares, como un disco real
+      const n = Math.random() < 0.25 ? 2 + Math.floor(Math.random() * 5) : 1;
+      for (let k = 0; k < n; k++) print(...rmLine(stream.next().value).map((v, i) => (i === 0 ? esc(v) : v)));
+      streamTimer = setTimeout(tick, 70 + Math.random() * 230);
+    };
+    tick();
+  }
+
+  // Termina el modo segundo plano: últimas líneas y, tras una pausa, se oculta
+  function finishBackground(lines, hideAfter = 2500) {
+    if (!background) return;
+    clearTimeout(streamTimer);
+    streamTimer = null;
+    for (const [text, cls] of lines) print(esc(text), cls);
+    setTimeout(() => {
+      background = false;
+      root.classList.remove('term-bg');
+      root.setAttribute('aria-modal', 'true');
+      title.textContent = 'daniel@isla: ~';
+      field.disabled = false;
+      root.hidden = true;
+      print('[sistema reinstalado]', 'ok');
+    }, hideAfter);
+  }
 
   function run(line) {
     const [name, ...args] = line.trim().split(/\s+/);
@@ -353,7 +419,7 @@ export function createTerminal({ profile, projects, secrets, onOpen, onClose, on
   }
 
   function close() {
-    if (root.hidden) return;
+    if (root.hidden || background) return;
     if (playing) stopSnake();
     root.hidden = true;
     onClose();
@@ -362,8 +428,27 @@ export function createTerminal({ profile, projects, secrets, onOpen, onClose, on
   return {
     open,
     close,
+    // abierta e interactiva (no cuenta el modo segundo plano)
     get isOpen() {
-      return !root.hidden;
+      return !root.hidden && !background;
     },
+    // Una línea del borrado relacionada con el juego (árboles, rocas…)
+    removed(path) {
+      if (background) print(`eliminado '${esc(path)}'`, 'isla');
+    },
+    stopRemoving: () => {
+      clearTimeout(streamTimer);
+      streamTimer = null;
+    },
+    finishWin: () =>
+      finishBackground([
+        ["eliminado el directorio '/isla'", 'isla'],
+        [`rm: no se puede borrar '/': ${RM_BUSY}`, 'err'],
+        ['[ 1337.000000] isla: singularidad detectada en el sector 0', 'err'],
+      ], 4600),
+    finishLose: () =>
+      finishBackground([
+        ['[ 1337.000000] Kernel panic - not syncing: Attempted to kill init!', 'err'],
+      ], 3200),
   };
 }
