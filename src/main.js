@@ -14,6 +14,8 @@ import { createSecrets, konamiDetector } from './secrets.js';
 import { createTerminal } from './terminal.js';
 import { buildGoal } from './goal.js';
 import { buildFloppies } from './floppies.js';
+import { buildNote, NOTE_CMD } from './note.js';
+import { createDestruction } from './destruction.js';
 
 const STORAGE_KEY = 'elordenador-discovered';
 const ABOUT_POS = [0, -6.3];
@@ -63,7 +65,8 @@ async function main() {
 
   const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 400);
 
-  scene.add(new THREE.HemisphereLight(0xdff2ff, 0x5c8a3e, 1.6));
+  const hemi = new THREE.HemisphereLight(0xdff2ff, 0x5c8a3e, 1.6);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0d6, 2.6);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -106,6 +109,7 @@ async function main() {
   const goal = buildGoal(scene, colliders, GOAL_ANGLE, GOAL_R);
   const floppies = buildFloppies(scene, stations, colliders);
   if (floppies.count === floppies.total) player.setGold(true);
+  const note = buildNote(scene, colliders);
 
   // ---------- Estado ----------
   let activeId = null;
@@ -131,6 +135,30 @@ async function main() {
   const discovered = loadDiscovered();
   hud.setCount(discovered.size);
   let won = discovered.size === projects.length;
+
+  // Minijuego secreto de destrucción masiva (rm -rf --no-preserve-root /)
+  const destruction = createDestruction({
+    scene,
+    props: world.props,
+    colliders,
+    player,
+    bursts,
+    sfx,
+    hud,
+    secrets,
+    walkLimit,
+    look: { scene, hemi, sun },
+    respawnCube: (c) => skillCubes.respawn(c),
+    onWin: () => (fireworks = 4),
+    // El log de la terminal en segundo plano también registra lo que destruyes
+    onKill: (e) => terminal.removed(e.kind === 'tree' ? `/isla/arboles/arbol_${String(e.i).padStart(3, '0')}` : `/isla/rocas/roca_${String(e.i).padStart(3, '0')}`),
+    onPhase: (phase) => (phase === 'win' ? terminal.finishWin() : terminal.finishLose()),
+  });
+  const noInput = { axis: () => ({ x: 0, z: 0 }), running: () => false, consumeJump: () => false };
+  const readNote = () => {
+    hud.toast(`<strong>Nota del sysadmin:</strong> «Pase lo que pase, NUNCA escribas <code>${NOTE_CMD}</code> en la terminal. La isla no lo perdonaría.»`, 9000);
+    secrets.unlock('nota');
+  };
 
   function toggleParty() {
     party = !party;
@@ -173,6 +201,7 @@ async function main() {
   }
 
   const interact = () => {
+    if (destruction.active) return destruction.fire();
     if (!activeId) return;
     const url = activeId === 'about' ? profile.github : projects.find((p) => p.id === activeId).repo;
     window.open(url, '_blank', 'noopener');
@@ -196,6 +225,7 @@ async function main() {
       canvas.focus();
     },
     onParty: toggleParty,
+    onDestroy: () => destruction.start(),
   });
   const konami = konamiDetector(() => {
     secrets.unlock('konami');
@@ -258,7 +288,8 @@ async function main() {
   $('#textmode-close').addEventListener('click', closeText);
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape' && terminal.isOpen) return terminal.close();
-    if (e.code === 'Backquote' && started && textMode.hidden) {
+    if (e.code === 'KeyF' && destruction.active && textMode.hidden && !e.repeat) return destruction.fire();
+    if (e.code === 'Backquote' && started && textMode.hidden && !destruction.busy) {
       e.preventDefault();
       return terminal.isOpen ? terminal.close() : terminal.open();
     }
@@ -274,13 +305,18 @@ async function main() {
   let badgeTaps = 0;
   let badgeTimer = null;
   $('.badge').addEventListener('click', () => {
-    if (!started) return;
+    if (!started || destruction.busy) return;
     clearTimeout(badgeTimer);
     badgeTimer = setTimeout(() => (badgeTaps = 0), 1500);
     if (++badgeTaps >= 5) {
       badgeTaps = 0;
       terminal.open();
     }
+  });
+
+  // Con ratón, el clic también dispara cohetes
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button === 0 && destruction.active && textMode.hidden) destruction.fire();
   });
 
   // Zoom con la rueda
@@ -320,8 +356,9 @@ async function main() {
     const dt = Math.min(timer.getDelta(), 0.05);
     elapsed += dt;
 
-    player.update(dt, input, colliders, groundAt, walkLimit, sfx);
+    player.update(dt, destruction.locked ? noInput : input, colliders, groundAt, walkLimit, sfx);
     skillCubes.update(dt, player, colliders, groundAt, edgeAt, sfx);
+    if (textMode.hidden) destruction.update(dt, skillCubes.cubes);
 
     // Minijuego: goles en la portería escondida
     for (const c of skillCubes.cubes) {
@@ -335,6 +372,7 @@ async function main() {
     }
     if (started) {
       floppies.update(elapsed, player, pickFloppy);
+      if (!destruction.busy) note.update(player, readNote);
       if (player.face === 'sleep') secrets.unlock('siesta');
     }
     if (party) {
@@ -391,6 +429,11 @@ async function main() {
       lookAt.y = damp(lookAt.y, camTarget.y + 1, 6, dt);
       lookAt.z = damp(lookAt.z, camTarget.z, 6, dt);
       camera.lookAt(lookAt);
+      const sh = destruction.shake;
+      if (sh > 0) {
+        camera.position.x += (Math.random() - 0.5) * sh;
+        camera.position.y += (Math.random() - 0.5) * sh;
+      }
     } else {
       // Vuelta panorámica mientras se muestra la portada
       const a = elapsed * 0.08;
@@ -402,7 +445,7 @@ async function main() {
     sun.position.copy(player.pos).add(SUN_OFFSET);
     sun.target.position.copy(player.pos);
 
-    if (started && ++miniFrame % 2 === 0) hud.drawMinimap(player, stations, discovered, ABOUT_POS, elapsed);
+    if (started && ++miniFrame % 2 === 0) hud.drawMinimap(player, stations, discovered, ABOUT_POS, elapsed, destruction.dots());
 
     renderer.render(scene, camera);
     requestAnimationFrame(frame);

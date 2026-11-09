@@ -77,6 +77,27 @@ export const sfx = {
   },
   eat: () => tone(660, 0.06, { type: 'square', vol: 0.04, to: 990 }),
   over: () => tone(330, 0.5, { type: 'sawtooth', vol: 0.05, to: 80 }),
+  // Modo destrucción
+  alarm: () => {
+    for (let i = 0; i < 3; i++) {
+      tone(880, 0.28, { type: 'sawtooth', vol: 0.05, to: 440, delay: i * 0.34 });
+    }
+  },
+  launch: () => {
+    noise(0.25, 0.1, 3000);
+    tone(500, 0.2, { type: 'sawtooth', vol: 0.03, to: 1400 });
+  },
+  boom: () => {
+    noise(0.6, 0.22, 600);
+    tone(90, 0.45, { type: 'sine', vol: 0.22, to: 30 });
+  },
+  crunch: () => noise(0.18, 0.12, 1400),
+  hurt: () => tone(220, 0.25, { type: 'square', vol: 0.07, to: 90 }),
+  blackhole: () => {
+    tone(70, 4.2, { type: 'sawtooth', vol: 0.06, to: 28 });
+    tone(140, 4.2, { type: 'sine', vol: 0.08, to: 40 });
+    noise(4, 0.05, 300);
+  },
   win: () =>
     [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) =>
       tone(f, 0.25, { type: 'square', vol: 0.045, delay: i * 0.11 })

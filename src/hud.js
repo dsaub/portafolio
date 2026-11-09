@@ -107,7 +107,7 @@ export function createHud(projects, profile, secrets) {
       };
       next();
     },
-    drawMinimap(player, stations, discovered, aboutPos, t) {
+    drawMinimap(player, stations, discovered, aboutPos, t, enemies = []) {
       const W = mini.width, H = mini.height;
       const scale = (W / 2 - 6) / (ISLAND_R + 3);
       const tx = (x) => W / 2 + x * scale;
@@ -170,6 +170,10 @@ export function createHud(projects, profile, secrets) {
           mctx.fillText('?', tx(s.x), ty(s.z) + 0.5);
         }
       }
+
+      // Enemigos del modo destrucción
+      mctx.fillStyle = '#ff2a2a';
+      for (const e of enemies) mctx.fillRect(tx(e.x) - 2, ty(e.z) - 2, 4, 4);
 
       // Jugador (flecha)
       mctx.save();

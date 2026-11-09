@@ -169,7 +169,8 @@ export function buildWorld(scene, stationAngles) {
       leafMesh.setColorAt(li, c.setHex(leafColor).offsetHSL(0, 0, (rand() - 0.5) * 0.06));
       li++;
     }
-    colliders.push({ x: t.x, z: t.z, r: 0.75 });
+    t.collider = { x: t.x, z: t.z, r: 0.75 };
+    colliders.push(t.collider);
   });
   scene.add(trunkMesh, leafMesh);
 
@@ -193,7 +194,8 @@ export function buildWorld(scene, stationAngles) {
     m.compose(p.set(r.x, r.s * 0.35 + terrainHeight(r.x, r.z), r.z), q, s.set(r.s, r.s * 0.75, r.s));
     rockMesh.setMatrixAt(i, m);
     rockMesh.setColorAt(i, c.setHex(pick([0x9a9a9a, 0x8b8f94, 0xa7a59f])));
-    colliders.push({ x: r.x, z: r.z, r: r.s * 0.9 });
+    r.collider = { x: r.x, z: r.z, r: r.s * 0.9 };
+    colliders.push(r.collider);
   });
   scene.add(rockMesh);
 
@@ -302,6 +304,8 @@ export function buildWorld(scene, stationAngles) {
 
   return {
     colliders,
+    // Para el modo destrucción: todo lo que se puede romper (y restaurar)
+    props: { trees, rocks, flowers, trunkMesh, leafMesh, rockMesh, stemMesh, petalMesh, waterMat },
     fadeSign,
     update(t, dt) {
       for (const u of updaters) u(t, dt);
