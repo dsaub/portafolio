@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Daniel · elordenador</title>
+    <meta name="description" content="Portfolio interactivo en 3D de Daniel (elordenador): explora una isla de vóxeles y descubre sus proyectos." />
+    <meta name="theme-color" content="#9fd8ff" />
+    <meta property="og:title" content="Daniel · elordenador" />
+    <meta property="og:description" content="Portfolio jugable en 3D. Explora la isla y descubre mis proyectos." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <canvas id="scene" tabindex="-1" aria-label="Isla 3D del portfolio"></canvas>
+
+    <!-- HUD -->
+    <header class="hud-top">
+      <div class="badge">
+        <span class="badge-name">Daniel</span>
+        <span class="badge-alias">elordenador</span>
+      </div>
+      <div class="hud-right">
+        <div class="counter" aria-live="polite">
+          <span class="counter-label">Proyectos</span>
+          <span id="counter-value" class="counter-value">0/6</span>
+          <span class="counter-track"><span id="counter-bar" class="counter-bar"></span></span>
+        </div>
+        <canvas id="minimap" width="150" height="150" aria-hidden="true"></canvas>
+        <div class="hud-buttons">
+          <button class="chip" type="button" data-open-text>Modo texto</button>
+          <button class="chip" type="button" id="mute-btn" aria-pressed="false"><span>Sonido: sí</span></button>
+        </div>
+      </div>
+    </header>
+
+    <div class="help">
+      <span class="keys-desktop"><kbd>WASD</kbd> moverse · <kbd>Shift</kbd> correr · <kbd>Espacio</kbd> saltar · <kbd>E</kbd> abrir</span>
+      <span class="keys-touch">Joystick para moverte · botón para saltar</span>
+    </div>
+
+    <aside id="panel" class="panel" aria-live="polite"></aside>
+    <div id="toast" class="toast" role="status"></div>
+
+    <!-- Controles táctiles -->
+    <div id="joystick" class="joystick" aria-hidden="true"><div id="joystick-knob" class="joystick-knob"></div></div>
+    <button id="jump-btn" class="jump-btn" type="button" aria-label="Saltar">↑</button>
+
+    <!-- Portada -->
+    <section id="start" class="start">
+      <div class="start-card">
+        <p class="start-kicker">Portfolio jugable</p>
+        <h1>Daniel <span>aka elordenador</span></h1>
+        <p class="start-lead">Bienvenido/a a mi isla. Cada haz de luz esconde uno de mis proyectos: camina hasta su pedestal para descubrirlo. Y si te aburres, patea los cubos de tecnologías de la plaza.</p>
+        <ul class="start-keys">
+          <li><kbd>WASD</kbd> / flechas <span>moverse</span></li>
+          <li><kbd>Shift</kbd> <span>correr</span></li>
+          <li><kbd>Espacio</kbd> <span>saltar</span></li>
+          <li><kbd>E</kbd> <span>abrir proyecto</span></li>
+        </ul>
+        <div class="start-actions">
+          <button id="play-btn" class="btn btn-big" type="button" disabled>Cargando…</button>
+          <button class="btn btn-ghost" type="button" data-open-text>Ver en modo texto</button>
+        </div>
+        <p class="webgl-msg">Tu navegador no ha podido iniciar WebGL. Puedes ver todo el contenido en <button type="button" class="link" data-open-text>modo texto</button>.</p>
+      </div>
+    </section>
+
+    <!-- Versión en texto (accesible y para quien tenga prisa) -->
+    <section id="textmode" class="textmode" hidden aria-labelledby="textmode-title">
+      <div class="textmode-inner">
+        <div class="textmode-head">
+          <div>
+            <p class="start-kicker">Modo texto</p>
+            <h2 id="textmode-title">Daniel <span class="alias">aka elordenador</span></h2>
+            <p id="textmode-bio" class="panel-tagline"></p>
+          </div>
+          <button id="textmode-close" class="btn btn-ghost" type="button">Volver a la isla</button>
+        </div>
+        <div id="textmode-list" class="textmode-list"></div>
+        <p class="textmode-foot"><a href="https://github.com/dsaub" target="_blank" rel="noopener">github.com/dsaub</a></p>
+      </div>
+    </section>
+
+    <noscript>
+      <div class="noscript">
+        <h1>Daniel · elordenador</h1>
+        <p>Este portfolio es un juego en 3D y necesita JavaScript. Mis proyectos están en <a href="https://github.com/dsaub">github.com/dsaub</a>.</p>
+      </div>
+    </noscript>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
