@@ -159,6 +159,22 @@
 
 /* ---------- Diálogos y controles ---------- */
 .w31-shield { position: absolute; inset: 0; }
+.w31-bsod {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: block;
+  background: #0000aa;
+  color: #ffffff;
+  cursor: none;
+}
+.w31-bsod { font-family: 'VT323', 'Courier New', monospace; font-size: 21px; line-height: 1.12; padding: 9% 9%; }
+.w31-bsod p { margin: 0 0 1em; }
+.w31-bsod ul { margin: 0 0 1.4em; padding: 0; list-style: none; }
+.w31-bsod li { padding-left: 1.2em; text-indent: -1.2em; }
+.w31-bsod li::before { content: '* '; }
+.w31-bsod-tag { display: table; margin: 0 auto 1.2em; padding: 0 6px; background: #c0c0c0; color: #000000; }
+.w31-bsod-hint { text-align: center; margin-top: 1.2em; }
 .w31-dialog .w31-client { padding: 12px 14px 10px; }
 .w31-dlg-row { display: flex; gap: 14px; align-items: flex-start; }
 .w31-dlg-text { padding-top: 4px; font-size: 13px; line-height: 17px; white-space: pre-line; }

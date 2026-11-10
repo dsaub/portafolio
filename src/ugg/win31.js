@@ -9,6 +9,7 @@ import { sfx, playMelody, NANA } from '../audio.js';
 
 const W = 640, H = 480;
 const MAX_APPS = 4;
+const BSOD_CHANCE = 0.1; // probabilidad de que un error grave tumbe el ordenador entero
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const thousands = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 const el = (tag, cls = '', html = '') => {
@@ -613,7 +614,7 @@ export function createPC({ state, save, secrets, onLullaby, onLeave }) {
     return drop;
   }
 
-  function makeWindow({ parent = desk, title, x, y, w, h, menu, icon = 'group', mdi = false, onClose, minimizable = true, maximizable = true, cls = '' }) {
+  function makeWindow({ parent = desk, title, x, y, w, h, menu, icon = 'group', mdi = false, onClose, minimizable = true, maximizable = true, cls = '', modal = false }) {
     const win = el('div', `w31-win${mdi ? ' w31-mdi' : ''}${cls ? ' ' + cls : ''}`);
     Object.assign(win.style, { left: `${x}px`, top: `${y}px`, width: `${w}px`, height: h === 'auto' ? 'auto' : `${h}px` });
     win.innerHTML = `
@@ -648,7 +649,8 @@ export function createPC({ state, save, secrets, onLullaby, onLeave }) {
       focus() {
         for (const sib of parent.children) if (sib !== win && sib.classList.contains('w31-win')) sib.classList.remove('active');
         win.classList.add('active');
-        win.style.zIndex = ++z;
+        // Un diálogo modal debe quedarse encima de su escudo: si no, deja de recibir clics
+        win.style.zIndex = modal ? ++z + 1000 : ++z;
         if (mdi && pm) pm.focus();
       },
       close() {
@@ -755,10 +757,12 @@ export function createPC({ state, save, secrets, onLullaby, onLeave }) {
 
   // Diálogo modal: bloquea el resto del escritorio hasta que se cierra
   function dialog({ title = 'UGGDOWS', icon = 'info', text = '', buttons = ['Aceptar'], width = 320, body, onButton }) {
+    // Error grave: a veces el ordenador entero se va al pantallazo azul
+    if (icon === 'stop' && !crashing && Math.random() < BSOD_CHANCE) return crash();
     sfx.ding();
     const shield = el('div', 'w31-shield');
     desk.append(shield);
-    const d = makeWindow({ parent: desk, title, x: Math.round((W - width) / 2), y: 140, w: width, h: 'auto', minimizable: false, maximizable: false, cls: 'w31-dialog', onClose: () => shield.remove() });
+    const d = makeWindow({ parent: desk, title, x: Math.round((W - width) / 2), y: 140, w: width, h: 'auto', minimizable: false, maximizable: false, cls: 'w31-dialog', modal: true, onClose: () => shield.remove() });
     d.el.style.zIndex = ++z + 1000;
     shield.style.zIndex = d.el.style.zIndex - 1;
     const row = el('div', 'w31-dlg-row');
@@ -780,6 +784,39 @@ export function createPC({ state, save, secrets, onLullaby, onLeave }) {
     });
     d.client.append(btns);
     return d;
+  }
+  // Error fatal: la pantalla del monitor se vuelve azul con una caja gris tipo Windows 3.1.
+  // Cualquier tecla reinicia el ordenador entero.
+  let crashing = false;
+  function crash() {
+    crashing = true;
+    sfx.alarm();
+    closeAll();
+    mode = 'crash';
+    const screenEl = root.querySelector('.w31-screen');
+    const scr = el('div', 'w31-bsod', '');
+    scr.innerHTML = `
+      <div class="w31-bsod-tag">UGGDOWS</div>
+      <p>Ugg ha intentado guardar todo su amor en el disquete A:, y el disquete no cabe. UGGDOWS no sabe qué hacer con tanto amor y se ha quedado sin palabras.</p>
+      <p>Ugg no ha hecho nada malo. Ugg solo quería que te quedaras un poquito más.</p>
+      <ul>
+        <li>Presione cualquier tecla para reiniciar el ordenador y volver a empezar con Ugg.</li>
+        <li>Perderá la información no guardada. Ugg ya tiene la suya.</li>
+      </ul>
+      <div class="w31-bsod-hint">Presione cualquier tecla para continuar ♥_</div>`;
+    screenEl.append(scr);
+    // Espera un poco para que la tecla que causó el error no reinicie al instante
+    setTimeout(() => {
+      const onKey = (e) => {
+        e.preventDefault();
+        document.removeEventListener('keydown', onKey, true);
+        scr.remove();
+        crashing = false;
+        power = false;
+        boot();
+      };
+      document.addEventListener('keydown', onKey, true);
+    }, 1200);
   }
   const memoryError = () =>
     dialog({ title: 'Administrador de programas', icon: 'stop', text: 'No hay suficiente memoria para ejecutar esta aplicación. Cierre una o más aplicaciones e inténtelo de nuevo.' });
@@ -822,6 +859,7 @@ export function createPC({ state, save, secrets, onLullaby, onLeave }) {
     if (appWins.size >= MAX_APPS) return busy(400), setTimeout(memoryError, 300);
     busy(600);
     setTimeout(() => {
+      if (crashing) return; // el ordenador se ha caído mientras se abría
       const w = app(arg);
       if (w) appWins.add(w);
     }, 350);
