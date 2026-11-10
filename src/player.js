@@ -40,6 +40,14 @@ FACES.ko = [
 const SLEEP_AFTER = 20;
 
 function drawFace(ctx, face) {
+  if (face === 'bsod') {
+    // Pantallazo azul de Windows 95: fondo azul y líneas blancas de texto
+    ctx.fillStyle = '#0000aa';
+    ctx.fillRect(0, 0, 64, 48);
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 7; i++) ctx.fillRect(4, 5 + i * 5, 12 + ((i * 17) % 40), 2);
+    return;
+  }
   ctx.fillStyle = '#0d2b1c';
   ctx.fillRect(0, 0, 64, 48);
   ctx.fillStyle = 'rgba(93,255,138,0.07)';

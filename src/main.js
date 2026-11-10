@@ -16,7 +16,7 @@ import { buildGoal } from './goal.js';
 import { buildFloppies } from './floppies.js';
 import { buildNote, NOTE_CMD } from './note.js';
 import { createDestruction } from './destruction.js';
-import { createSea } from './sea.js';
+import { createSea, SEA_FLOOR } from './sea.js';
 import { createUggIsland } from './ugg/island.js';
 
 const STORAGE_KEY = 'elordenador-discovered';
@@ -159,8 +159,10 @@ async function main() {
   const sea = createSea({ scene, player, bursts, sfx, hud, secrets, onCapture: () => ugg.capture() });
   // La isla de Ugg: si te secuestra, no vuelves (ni recargando) hasta escapar
   const ugg = createUggIsland({ scene, colliders, player, bursts, sfx, hud, secrets, input: { setEnabled: (v) => input.setEnabled(v && started) }, onEscaped: () => (fireworks = 4) });
-  // Fuera del minijuego puedes llegar hasta el agua (y caerte)
-  const playerLimit = (x, z) => (ugg.active ? Infinity : destruction.busy ? walkLimit(x, z) : edgeAt(x, z) + 2.5);
+  // Fuera del minijuego no hay pared: puedes salirte de la isla (y caerte al agua)
+  const playerLimit = (x, z) => (destruction.busy && !ugg.active ? walkLimit(x, z) : Infinity);
+  // Sobre el mar no hay suelo: caes por gravedad hasta tocar el agua (ahí se encarga sea.js)
+  const playerGround = (x, z) => (ugg.active || isLand(x, z) ? groundAt(x, z) : SEA_FLOOR);
   const noInput = { axis: () => ({ x: 0, z: 0 }), running: () => false, consumeJump: () => false };
   const readNote = () => {
     hud.toast(`<strong>Nota del sysadmin:</strong> «Pase lo que pase, NUNCA escribas <code>${NOTE_CMD}</code> en la terminal. La isla no lo perdonaría.»`, 9000);
@@ -366,7 +368,7 @@ async function main() {
     const dt = Math.min(timer.getDelta(), 0.05);
     elapsed += dt;
 
-    player.update(dt, destruction.locked || sea.busy || ugg.locked ? noInput : input, colliders, groundAt, playerLimit, sfx);
+    player.update(dt, destruction.locked || sea.busy || ugg.locked ? noInput : input, colliders, playerGround, playerLimit, sfx);
     if (started && textMode.hidden && !destruction.busy && !sea.busy && !ugg.active && !isLand(player.pos.x, player.pos.z)) sea.trigger();
     if (textMode.hidden) sea.update(dt);
     if (textMode.hidden) ugg.update(dt, elapsed);
